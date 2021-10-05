@@ -4,15 +4,31 @@ nbcw
 A simple wrapper for `jupyter nbconvert`, mainly for me.
 
 
+Requirement
+-----------
+
+Python 3, tested with 3.6.
+
+
+Install
+-------
+
+Copy the `nbcw` script to $PATH.
+
+
 How to use
 ----------
 
-```
-nbcw --help
-```
+Check the help text.
+
+  nbcw --help
+
+An example usage is like below.
+
+  nbcw --title 'Training DNN' ./training_dnn.ipynb -o output.pdf
 
 
 License
 -------
 
-See each file.
+See the code comment.

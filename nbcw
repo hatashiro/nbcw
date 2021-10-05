@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 # Copyright 2021 Jun <https://github.com/hatashiro>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,3 +14,102 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import json
+import os
+import subprocess
+import sys
+
+class Argv:
+  def __init__(self, argv):
+    self.options = {}
+    self.inputs = []
+    self.parse_argv(argv)
+
+  def parse_argv(self, argv):
+    key = None
+    for arg in argv:
+      if arg.startswith('-'):
+        arg = arg.lstrip('-')
+        if key: self.options[key] = True
+        if '=' in arg:
+          tokens = arg.split('=')
+          self.options[tokens[0]] = '='.join(tokens[1:])
+          key = None
+        else:
+          key = arg
+      elif key:
+        self.options[key] = arg
+        key = None
+      else:
+        self.inputs.append(arg)
+    if key: self.options[key] = True
+
+  def __getitem__(self, key):
+    return self.options.get(key, None)
+
+def print_help():
+  print('''usage: nbcw [options] <input>
+
+options:
+  --help               Print the help text.
+  --title              Override the title of the input metadata.
+  --authors            Override the authors of the input metadata.
+                       Comma separated.
+  -o,--out,--output    The output file path.
+                       Default: {the input file's basename}.pdf
+  --to                 The output type.
+                       Default: decided from the output extension
+  --template           The template used by nbconvert.
+''')
+
+def main(argv):
+  if argv['help'] or len(argv.inputs) != 1:
+    return print_help()
+
+  input_path = argv.inputs[0]
+  with open(input_path) as f:
+    notebook = json.load(f)
+
+  if 'metadata' not in notebook: notebook['metadata'] = {}
+  if argv['title']:
+    notebook['metadata']['title'] = argv['title']
+  if argv['authors']:
+    authors = [{'name': author} for author in argv['authors'].split(',')]
+    notebook['metadata']['authors'] = authors
+
+  output_path = argv['o'] or argv['out'] or argv['output']
+  if output_path:
+    output_base, output_ext = os.path.splitext(
+        os.path.basename(output_path))
+    output_dir = os.path.dirname(output_path)
+  else:
+    output_base, _ = os.path.splitext(os.path.basename(input_path))
+    output_ext = '.pdf'
+    output_dir = os.getcwd()
+
+  to = argv['to'] or {
+    '.pdf': 'pdf',
+    '.tex': 'latex',
+    '.html': 'html',
+    '.md': 'markdown',
+    '.markdown': 'markdown',
+    '.rst': 'rst',
+    '.ipynb': 'notebook',
+  }.get(output_ext, 'pdf')
+
+  nbconvert_argv = [
+    '--to', to,
+    '--output', output_base,
+    '--output-dir', output_dir,
+    '--stdin',
+  ]
+  if argv['template']: nbconvert_argv += ['--template', argv['template']]
+
+  subprocess.run(
+      ['jupyter', 'nbconvert'] + nbconvert_argv,
+      input=json.dumps(notebook),
+      encoding='utf-8')
+
+if __name__ == '__main__':
+  main(Argv(sys.argv[1:]))
